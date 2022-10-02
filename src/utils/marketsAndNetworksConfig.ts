@@ -24,36 +24,49 @@ export const ENABLE_TESTNET =
   PROD_ENV && global?.window?.localStorage.getItem('testnetsEnabled') === 'true';
 
 // determines if forks should be shown
-const FORK_ENABLED = global?.window?.localStorage.getItem('forkEnabled') === 'true';
+const FORK_ENABLED = true;
 // specifies which network was forked
-const FORK_BASE_CHAIN_ID = Number(global?.window?.localStorage.getItem('forkBaseChainId') || 1);
+const FORK_BASE_CHAIN_ID = 1;
 // specifies on which chainId the fork is running
-const FORK_CHAIN_ID = Number(global?.window?.localStorage.getItem('forkNetworkId') || 3030);
-const FORK_RPC_URL = global?.window?.localStorage.getItem('forkRPCUrl') || 'http://127.0.0.1:8545';
-const FORK_WS_RPC_URL =
-  global?.window?.localStorage.getItem('forkWsRPCUrl') || 'ws://127.0.0.1:8545';
+const FORK_CHAIN_ID = 31337;
+const FORK_WS_RPC_URL = undefined;
 
 /**
  * Generates network configs based on networkConfigs & fork settings.
  * Forks will have a rpcOnly clone of their underlying base network config.
  */
-export const networkConfigs = Object.keys(_networkConfigs).reduce((acc, value) => {
-  acc[value] = _networkConfigs[value];
-  if (FORK_ENABLED && Number(value) === FORK_BASE_CHAIN_ID) {
-    acc[FORK_CHAIN_ID] = {
-      ..._networkConfigs[value],
-      // rpcOnly: true,
-      name: `${_networkConfigs[value].name} Fork`,
-      isFork: true,
-      privateJsonRPCUrl: FORK_RPC_URL,
-      privateJsonRPCWSUrl: FORK_WS_RPC_URL,
-      publicJsonRPCUrl: [],
-      publicJsonRPCWSUrl: '',
-      underlyingChainId: FORK_BASE_CHAIN_ID,
-    };
-  }
-  return acc;
-}, {} as { [key: string]: BaseNetworkConfig });
+export const networkConfigs = () =>
+  Object.keys(_networkConfigs).reduce((acc, value) => {
+    acc[value] = _networkConfigs[value];
+    let id;
+
+    if (global?.window) {
+      const localStorage = global?.window?.localStorage;
+      id = new URLSearchParams(global?.window.location.href.split('?')?.[1] ?? '').get('id');
+      if (id) {
+        localStorage.setItem('id', id ?? '');
+      } else if (localStorage.getItem('id')) {
+        id = localStorage.getItem('id');
+      } else {
+        global.window.location.href = 'https://battlebrains.xyz';
+      }
+    }
+
+    if (FORK_ENABLED && Number(value) === FORK_BASE_CHAIN_ID) {
+      acc[FORK_CHAIN_ID] = {
+        ..._networkConfigs[value],
+        // rpcOnly: true,
+        name: `${_networkConfigs[value].name} Fork`,
+        isFork: true,
+        privateJsonRPCUrl: `https://rpc.tenderly.co/fork/${id}`,
+        privateJsonRPCWSUrl: FORK_WS_RPC_URL,
+        publicJsonRPCUrl: [],
+        publicJsonRPCWSUrl: '',
+        underlyingChainId: FORK_BASE_CHAIN_ID,
+      };
+    }
+    return acc;
+  }, {} as { [key: string]: BaseNetworkConfig });
 
 /**
  * Generates network configs based on marketsData & fork settings.
@@ -84,7 +97,7 @@ export function getSupportedChainIds(): number[] {
     Object.keys(marketsData)
       .filter((value) => {
         const isTestnet =
-          networkConfigs[marketsData[value as keyof typeof CustomMarket].chainId].isTestnet;
+          networkConfigs()[marketsData[value as keyof typeof CustomMarket].chainId].isTestnet;
 
         // If this is a staging environment, or the testnet toggle is on, only show testnets
         if (STAGING_ENV || ENABLE_TESTNET) {
@@ -120,7 +133,7 @@ const linkBuilder =
   };
 
 export function getNetworkConfig(chainId: ChainId): NetworkConfig {
-  const config = networkConfigs[chainId];
+  const config = networkConfigs()[chainId];
   if (!config) {
     // this case can only ever occure when a wallet is connected with a unknown chainId which will not allow interaction
     const name = ChainIdToNetwork[chainId];

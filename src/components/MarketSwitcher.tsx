@@ -29,8 +29,7 @@ import StyledToggleButtonGroup from './StyledToggleButtonGroup';
 
 export const getMarketInfoById = (marketId: CustomMarket) => {
   const market: MarketDataType = marketsData[marketId as CustomMarket];
-  const network: BaseNetworkConfig = networkConfigs[market.chainId];
-
+  const network: BaseNetworkConfig = networkConfigs()[market.chainId];
   return { market, network };
 };
 
